@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    /* 基础设定 */
+    body {
+        margin: 0; padding: 10px; font-family: sans-serif;
+    }
+    :root {
+        --lh-paper-bg: 245, 240, 230;
+        --lh-book-color: 139, 69, 19;
+    }
+
+    /* 1. 外层固定书皮 */
+    .book-wrapper {
+        background: rgb(var(--lh-book-color));
+        /* 上下保留 10px，左右缩减至 20px */
+        padding: 10px 20px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        border-radius: 8px;
+        margin: 0 auto;
+        position: relative;
+    }
+
+    /* 2. 中间视窗（相框） */
+    .book-viewport {
+        overflow: hidden;
+        width: 100%;
+        background: rgb(var(--lh-paper-bg));
+        border-radius: 3px;
+        box-shadow: 0 0 8px rgba(0,0,0,0.3) inset;
+    }
+
+    /* 3. 内层滑动轨道 */
+    .book-track {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    /* 单页样式 */
+    .notepaper {
+        background: linear-gradient(rgb(var(--lh-paper-bg)) 95%, #ddd 0);
+        line-height: 2em;
+        background-size: 100% 2em;
+        background-attachment: local;
+        border: 2em solid rgb(var(--lh-paper-bg));
+        box-shadow: -2px 0 5px rgba(0,0,0,0.05) inset;
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+        position: relative;
+        flex: 0 0 100%;
+    }
+
+    .notepaper p { margin: 0; font-size: 1.05rem; letter-spacing: 0.1rem; }
+
+    /* 自动生成底部页码 */
+    .notepaper::after {
+        content: "- " attr(data-page) " -";
+        position: absolute;
+        bottom: -1.7em;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 0.9em;
+        color: #666;
+        letter-spacing: 2px;
+    }
+
+    @media screen and (min-width: 500px) {
+        .notepaper { flex: 0 0 50%; }
+    }
+
+    /* 去按钮化：隐形热区按钮 */
+    .nav-btn {
+        position: absolute;
+        top: 0; /* 占满高度 */
+        height: 100%;
+        width: 20px; /* 宽度和书衣 padding 一致 */
+        background: transparent; /* 完全透明 */
+        border: none;
+        outline: none;
+        cursor: pointer;
+        z-index: 10;
+        padding: 0;
+        user-select: none; /* 防止连点时选中文字 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 1.1rem;
+        font-weight: bold;
+        transition: background 0.2s, color 0.2s;
+    }
+    
+    /* 鼠标悬浮时给书衣边缘一点点极微弱的加深暗示（不喜欢可删除下面三行） */
+    .nav-btn:hover {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    /* 到达尽头无法点击时恢复完全透明，指针变成默认 */
+    .nav-btn:disabled {
+        background: transparent;
+        cursor: default;
+        color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* 完美贴合外层书衣的圆角 */
+    .btn-prev {
+        left: 0;
+        border-radius: 8px 0 0 8px;
+    }
+    .btn-next {
+        right: 0;
+        border-radius: 0 8px 8px 0;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="book-wrapper">
+    <!-- 删除了按钮内的箭头符号，现在它们是隐形的翻页热区了 -->
+    <button class="nav-btn btn-prev" id="prevBtn" onclick="turnPage(-1)">&#10094;</button>
+    <button class="nav-btn btn-next" id="nextBtn" onclick="turnPage(1)">&#10095;</button>
+
+    <div class="book-viewport">
+        <div class="book-track" id="bookTrack">
+
+            <!-- ======================= -->
+            <!-- 你的书本内容 -->
+            <!-- ======================= -->
+
+            <div class="notepaper">
+                <p>第一页内容</p>
+                <p>点击左边或右边的棕色书皮即可翻页。</p>
+            </div>
+
+            <div class="notepaper">
+                <p>第二页内容</p>
+                <p>底部会自动生成页数，不需要手打。</p>
+            </div>
+
+            <div class="notepaper">
+                <p>第三页内容</p>
+                <p>这里不知道写什么了。</p>
+            </div>
+
+            <div class="notepaper">
+                <p>第四页内容</p>
+                <p>最后一页了，点击右边书皮将没有反应。</p>
+            </div>
+
+            <!-- ======================= -->
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const track = document.getElementById('bookTrack');
+    const pages = document.querySelectorAll('.notepaper');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    let currentIndex = 0;
+
+    function getPagesPerView() {
+        return window.innerWidth >= 500 ? 2 : 1;
+    }
+
+    pages.forEach((page, index) => {
+        page.setAttribute('data-page', (index + 1));
+    });
+
+    function turnPage(direction) {
+        const pagesPerView = getPagesPerView();
+        const maxIndex = Math.max(0, pages.length - pagesPerView);
+
+        currentIndex += direction;
+
+        if (currentIndex < 0) currentIndex = 0;
+        if (currentIndex > maxIndex) currentIndex = maxIndex;
+
+        updateView();
+    }
+
+    function updateView() {
+        const pagesPerView = getPagesPerView();
+        const maxIndex = Math.max(0, pages.length - pagesPerView);
+        
+        if (currentIndex > maxIndex) currentIndex = maxIndex;
+
+        const pageOffset = pages[0].offsetWidth;
+        track.style.transform = `translateX(-${currentIndex * pageOffset}px)`;
+
+        // 更新按钮禁用状态
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = currentIndex >= maxIndex;
+    }
+
+    window.addEventListener('resize', updateView);
+    updateView();
+</script>
+<!-- 此段用于传入参数 -->
+<script>
+const params = new URLSearchParams(window.location.search);
+
+const var1 = params.get("lh-paper-bg");
+const var2 = params.get("lh-book-color");
+
+if (lh-paper-bg !== null) {
+    document.documentElement.style.setProperty("--lh-paper-bg", lh-paper-bg);
+}
+
+if (lh-book-color !== null) {
+    document.documentElement.style.setProperty("--lh-book-color", lh-book-color);
+}
+</script>
+</body>
+</html>
